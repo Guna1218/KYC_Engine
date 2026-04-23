@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KYC Formatter | Skylinx Global Solutions</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+
+/* ══ RESET ══ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: "Poppins", sans-serif; background: #080808; color: #d4d4d4; display: flex; flex-direction: column; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0d0d0d; }
+::-webkit-scrollbar-thumb { background: rgba(0,234,255,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,234,255,0.4); }
+
+@keyframes blink   { 50%{opacity:0} }
+@keyframes popIn   { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+@keyframes rowIn   { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse   { 0%,100%{box-shadow:0 0 6px #818cf8} 50%{box-shadow:0 0 14px #818cf8} }
+@keyframes slideIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+
+/* ══ GLOBAL HEADER ══ */
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 16px;
+  background: #0a0f12;
+  border-bottom: 1px solid rgba(0,234,255,0.2);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.hdr-left  { display: flex; align-items: center; gap: 10px; }
+.hdr-right { display: flex; align-items: center; gap: 8px; }
+
+.app-logo {
+  font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+  color: #00eaff; text-shadow: 0 0 8px #00eaff; text-transform: uppercase;
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #818cf8; box-shadow: 0 0 6px #818cf8;
+  animation: pulse 1.5s infinite; transition: .3s; flex-shrink: 0;
+}
+.status-dot.ready  { background: #4ade80; box-shadow: 0 0 5px #4ade80; animation: none; }
+.status-dot.active { background: #facc15; box-shadow: 0 0 5px #facc15; animation: none; }
+.status-dot.error  { background: #f87171; box-shadow: none; animation: none; }
+.status-badge {
+  font-size: 9px; padding: 2px 8px; border-radius: 4px;
+  background: #111; color: #555; border: 1px solid #1e1e1e;
+}
+.status-badge.ready { color: #4ade80; border-color: rgba(74,222,128,.3); }
+.perf-lbl { font-size: 9px; color: #3a3a3a; font-family: 'Consolas', monospace; }
+
+/* Clear All button */
+.btn-clear-all {
+  padding: 5px 14px; border-radius: 7px;
+  border: 1px solid rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.06);
+  color: #f87171; font-size: 10px; font-weight: 700;
+  cursor: pointer; font-family: 'Poppins', sans-serif;
+  transition: .2s; letter-spacing: .3px;
+}
+.btn-clear-all:hover {
+  background: rgba(248,113,113,0.14);
+  box-shadow: 0 0 10px rgba(248,113,113,0.25);
+  transform: translateY(-1px);
+}
+
+/* ══ SECTION DIVIDER ══ */
+.sec-bar {
+  display: flex; align-items: center; gap: 9px; padding: 5px 16px;
+  background: rgba(0,234,255,0.02);
+  border-top: 1px solid rgba(0,234,255,0.1);
+  border-bottom: 1px solid rgba(0,234,255,0.1);
+  flex-shrink: 0;
+}
+.sec-dot { width: 5px; height: 5px; border-radius: 50%; }
+.sec-dot.ocr { background: #00eaff; box-shadow: 0 0 6px #00eaff; }
+.sec-dot.kyc { background: #00eaff; box-shadow: 0 0 6px #00eaff; }
+.sec-bar span { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #555; }
+
+/* ══ SCROLL WRAPPER ══ */
+.app-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+
+/* ══ FOOTER ══ */
+.app-footer {
+  flex-shrink: 0; border-top: 1px solid rgba(0,234,255,0.08);
+  background: #0a0f12; padding: 7px 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.app-footer span { font-size: 10px; color: #333; }
+.app-footer a { color: #00eaff; text-decoration: none; font-weight: 600; text-shadow: 0 0 6px #00eaff; }
+.app-footer a:hover { color: #fff; }
+
+/* ══════════════════════════════════════════════════════
+   OCR SECTION — verbatim OCR_neon styles
+══════════════════════════════════════════════════════ */
+.ocr-neon {
+  font-family: "Poppins", sans-serif;
+  background: radial-gradient(circle at top, #0f2027, #080808);
+  color: #fff;
+  padding: 30px;
+  display: flex; flex-direction: column; align-items: center;
+  flex-shrink: 0;
+}
+.ocr-neon h2 {
+  padding: 18px 30px; border-radius: 14px;
+  background: rgba(0,0,0,0.45); border: 1px solid #00eaff;
+  box-shadow: 0 0 15px #00eaff, 0 0 30px #00eaff inset;
+  text-shadow: 0 0 10px #00eaff; margin-bottom: 25px;
+}
+.ocr-neon .note {
+  background: rgba(255,255,255,0.04); backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,234,255,0.5);
+  box-shadow: 0 0 12px rgba(0,234,255,0.4);
+  border-radius: 12px; padding: 18px;
+  width: 100%; max-width: 650px; margin-bottom: 20px;
+}
+#imageInput {
+  padding: 14px; border-radius: 12px; border: 2px dashed #00eaff;
+  background: rgba(255,255,255,0.03); color: white; cursor: pointer;
+  width: 100%; max-width: 650px;
+  box-shadow: 0 0 10px rgba(0,234,255,0.4); transition: 0.3s;
+}
+#imageInput:hover { box-shadow: 0 0 18px #00eaff; }
+#preview {
+  width: 100%; max-width: 650px; margin-top: 15px; padding: 15px;
+  border-radius: 12px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(0,234,255,0.5);
+  box-shadow: 0 0 15px rgba(0,234,255,0.3);
+}
+#preview img { width: 100%; border-radius: 8px; margin-bottom: 6px; }
+.ocr-neon button {
+  margin-top: 15px; padding: 12px 28px; border: none; border-radius: 10px;
+  font-size: 15px; cursor: pointer; color: white;
+  background: linear-gradient(90deg, #00eaff, #0072ff);
+  box-shadow: 0 0 10px #00eaff, 0 0 20px rgba(0,234,255,0.6); transition: 0.3s;
+}
+.ocr-neon button:hover { transform: translateY(-2px); box-shadow: 0 0 15px #00eaff, 0 0 35px #00eaff; }
+#outputText {
+  width: 100%; max-width: 650px; height: 230px; margin-top: 18px;
+  border-radius: 10px; border: 1px solid #00eaff;
+  background: #020202; color: #00eaff; padding: 12px; font-size: 14px;
+  box-shadow: 0 0 12px rgba(0,234,255,0.4) inset;
+}
+#loader { display: none; margin-top: 10px; color: #00eaff; text-shadow: 0 0 10px #00eaff; }
+
+/* ══════════════════════════════════════════════════════
+   KYC SECTION — split layout
+══════════════════════════════════════════════════════ */
+.kyc-section {
+  display: flex; flex-direction: row;
+  flex: 1; min-height: 500px;
+  border-top: 1px solid rgba(0,234,255,0.08);
+}
+
+/* ── LEFT: input panel ── */
+.kyc-left {
+  width: 340px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: radial-gradient(circle at top left, #0f2027 0%, #080808 80%);
+  border-right: 1px solid rgba(0,234,255,0.12);
+  padding: 22px 20px;
+  gap: 12px;
+}
+.kyc-input-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.4px;
+  text-transform: uppercase; color: rgba(0,234,255,0.4);
+}
+#kyc-txt {
+  width: 100%; flex: 1; min-height: 140px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(0,234,255,0.3);
+  border-radius: 10px; padding: 12px;
+  color: #00eaff; font-size: 12px; font-family: 'Consolas', monospace;
+  line-height: 1.6; resize: none;
+  box-shadow: 0 0 10px rgba(0,234,255,0.06) inset;
+  transition: border .2s, box-shadow .2s;
+}
+#kyc-txt::placeholder { color: rgba(0,234,255,0.13); }
+#kyc-txt:focus { outline: none; border-color: #00eaff; box-shadow: 0 0 16px rgba(0,234,255,0.15) inset; }
+
+/* button row */
+.kyc-btn-row { display: flex; gap: 8px; }
+#kyc-btn {
+  flex: 1; padding: 11px; border-radius: 10px; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 700; font-family: 'Poppins', sans-serif; color: #fff;
+  background: linear-gradient(90deg, #00eaff, #0072ff);
+  box-shadow: 0 0 10px #00eaff, 0 0 20px rgba(0,234,255,0.4); transition: .3s;
+}
+#kyc-btn:disabled { background: rgba(255,255,255,0.05); box-shadow: none; color: #333; cursor: default; }
+#kyc-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 18px #00eaff, 0 0 34px #00eaff; }
+#kyc-clear-btn {
+  padding: 11px 14px; border-radius: 10px;
+  border: 1px solid rgba(248,113,113,0.3);
+  background: rgba(248,113,113,0.06);
+  color: #f87171; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: 'Poppins', sans-serif; transition: .2s;
+}
+#kyc-clear-btn:hover { background: rgba(248,113,113,0.13); box-shadow: 0 0 10px rgba(248,113,113,0.2); }
+
+/* copy bar inside left panel */
+.kyc-copy-row {
+  display: none; flex-direction: column; gap: 6px;
+  padding-top: 4px; border-top: 1px solid rgba(0,234,255,0.1);
+}
+.kyc-cinfo { font-size: 9px; color: rgba(0,234,255,0.3); font-family: 'Consolas', monospace; }
+.kyc-cbtn {
+  padding: 8px; border-radius: 8px;
+  border: 1px solid rgba(0,234,255,0.3);
+  background: rgba(0,234,255,0.07);
+  color: #00eaff; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: 'Poppins', sans-serif; transition: .2s;
+}
+.kyc-cbtn:hover { background: rgba(0,234,255,0.14); box-shadow: 0 0 12px rgba(0,234,255,0.25); transform: translateY(-1px); }
+.kyc-cbtn.ok { border-color: #4ade80; background: rgba(74,222,128,.08); color: #4ade80; }
+
+/* ── RIGHT: code output ── */
+.kyc-right {
+  flex: 1; display: flex; flex-direction: column;
+  background: #0d0d0d; overflow: hidden;
+}
+.kyc-out {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+.kyc-ph {
+  color: #2a2a2a; font-size: 11px; text-align: center;
+  padding: 40px 20px; line-height: 2;
+  font-family: 'Consolas', monospace;
+}
+
+/* code view line */
+.cv-line {
+  display: flex; align-items: baseline; min-height: 22px;
+  animation: slideIn .12s ease-out;
+}
+.cv-line:hover { background: rgba(255,255,255,0.025); }
+.cv-ln {
+  min-width: 44px; text-align: right; padding: 2px 12px 2px 8px;
+  color: #2a2a2a; user-select: none; border-right: 1px solid #161616;
+  flex-shrink: 0; font-size: 11px; line-height: 22px;
+  font-family: 'Consolas', monospace; background: #0a0a0a;
+}
+.cv-code {
+  padding: 2px 14px; font-size: 11.5px; line-height: 22px;
+  white-space: nowrap; user-select: text; flex: 1; overflow-x: auto;
+  color: #ce9178;
+}
+.cv-code .f-na     { color: #f87171; }
+.cv-code .f-remark { color: #f59e0b; }
+.cv-code .f-sep    { color: #2a2a2a; }
+.cv-code .f-new    { animation: popIn .08s ease-out; }
+.cv-code .cur {
+  display: inline-block; width: 7px; height: 13px;
+  background: #00eaff; margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: blink .5s step-end infinite;
+  box-shadow: 0 0 5px #00eaff;
+}
+
+/* ══ TOAST ══ */
+#toast {
+  position: fixed; bottom: 18px; left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #1e1e1e; border: 1px solid #2a2a2a; color: #d4d4d4;
+  padding: 7px 16px; border-radius: 7px; font-size: 11px;
+  opacity: 0; pointer-events: none; transition: all .3s;
+  z-index: 9999; white-space: nowrap;
+  box-shadow: 0 6px 24px rgba(0,0,0,.7);
+  font-family: 'Consolas', monospace;
+}
+#toast.show    { opacity:1; transform:translateX(-50%) translateY(0); }
+#toast.success { border-color:#00eaff; color:#00eaff; }
+#toast.error   { border-color:#f87171; color:#f87171; }
+
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="app-header">
+  <div class="hdr-left">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="app-logo">KYC Suite</span>
+    <span class="status-badge" id="statusBadge">Loading model…</span>
+  </div>
+  <div class="hdr-right">
+    <span class="perf-lbl" id="perfLbl"></span>
+    <button class="btn-clear-all" onclick="clearAll()">🗑 Clear All</button>
+  </div>
+</header>
+
+<!-- ══ SCROLL AREA ══ -->
+<div class="app-scroll">
+
+  <!-- ════ OCR SECTION ════ -->
+  <div class="sec-bar">
+    <div class="sec-dot ocr"></div>
+    <span>AI Image → Text Converter</span>
+  </div>
+
+  <div class="ocr-neon">
+    <h2>⚡AI Image → Text Coneverter</h2>
+    <div class="note">
+      ✔ Paste screenshots using <b>CTRL + V</b><br>
+      ✔ Or upload images<br><br>
+      ✔ Click <b>Extract Text</b> to convert images to text
+    </div>
+    <input id="imageInput" type="file" accept="image/*" multiple>
+    <div id="preview"></div>
+    <button onclick="extractText()">Extract Text</button>
+    <div id="loader">⏳ Processing OCR...</div>
+    <textarea id="outputText" placeholder="Extracted text will appear here"></textarea>
+    <button id="copyBtn">📋 Copy Text</button>
+  </div>
+
+  <!-- ════ KYC SECTION ════ -->
+  <div class="sec-bar">
+    <div class="sec-dot kyc"></div>
+    <span>KYC Formatter Pro</span>
+  </div>
+
+  <div class="kyc-section">
+
+    <!-- LEFT: input -->
+    <div class="kyc-left">
+      <div class="kyc-input-label">Paste KYC Records</div>
+      <textarea id="kyc-txt"
+        placeholder="Paste Here"></textarea>
+
+      <div class="kyc-btn-row">
+        <button id="kyc-btn" onclick="doExtract()" disabled>Loading model…</button>
+        <button id="kyc-clear-btn" onclick="clearKyc()" title="Clear input & output">✕</button>
+      </div>
+
+      <div class="kyc-copy-row" id="kycCopyBar">
+        <span class="kyc-cinfo" id="kycCopyInfo"></span>
+        <button class="kyc-cbtn" id="kycCopyBtn" onclick="copyAllTSV()">⎘ Copy All TSV</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: code output -->
+    <div class="kyc-right">
+      <div class="kyc-out" id="kycOut">
+        <div class="kyc-ph">Be Patient</div>
+      </div>
+    </div>
+
+  </div><!-- end kyc-section -->
+
+</div><!-- end app-scroll -->
+
+<!-- ══ FOOTER ══ -->
+<footer class="app-footer">
+  <span>Designed and Developed by
+    <a href="#" onclick="openUrl('https://skylinxglobal.com/');return false;">Skylinx Global Solutions</a>
+    — All Rights Reserved
+  </span>
+</footer>
+
+<div id="toast"></div>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<script>
+
+/* ═══════════════════════════════════════════════════════
+   OCR_NEON JS — verbatim
+═══════════════════════════════════════════════════════ */
+
+let images = []
+
+document.getElementById("imageInput").addEventListener("change", function(e){
+  addFiles(e.target.files)
+})
+
+window.addEventListener("paste", function(event){
+  let items = event.clipboardData.items
+  for(let i = 0; i < items.length; i++){
+    if(items[i].type.indexOf("image") !== -1){
+      addFiles([items[i].getAsFile()])
+    }
+  }
+})
+
+function addFiles(files){
+  Array.from(files).forEach(file => {
+    let reader = new FileReader()
+    reader.onload = function(event){
+      let img = new Image()
+      img.src = event.target.result
+      img.onload = function(){
+        images.push(img)
+        document.getElementById("preview").appendChild(img.cloneNode())
+      }
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+async function preprocessImage(blob){
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      const scale = 2
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data = imageData.data
+      for(let i = 0; i < data.length; i += 4){
+        const avg = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2]
+        data[i] = data[i+1] = data[i+2] = avg > 180 ? 255 : avg < 80 ? 0 : avg
+      }
+      ctx.putImageData(imageData, 0, 0)
+      canvas.toBlob(resolve, "image/png")
+    }
+    img.src = URL.createObjectURL(blob)
+  })
+}
+
+async function extractText(){
+  if(images.length === 0){ alert("Add images first!"); return }
+  document.getElementById("loader").style.display = "block"
+  document.getElementById("outputText").value = ""
+  let maxWidth = Math.max(...images.map(i => i.width))
+  let totalHeight = images.reduce((sum, i) => sum + i.height + 10, 0)
+  let canvas = document.getElementById("canvas")
+  canvas.width = maxWidth; canvas.height = totalHeight
+  let ctx = canvas.getContext("2d")
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height)
+  let y = 0
+  images.forEach(img => { ctx.drawImage(img, 0, y); y += img.height + 10 })
+  canvas.toBlob(async blob => {
+    const enhancedBlob = await preprocessImage(blob)
+    const { data:{ text } } = await Tesseract.recognize(enhancedBlob, "eng", { psm:6, oem:3 })
+    document.getElementById("loader").style.display = "none"
+    document.getElementById("outputText").value = text.trim() || "No text detected."
+  })
+}
+
+document.getElementById("copyBtn").addEventListener("click", copyText)
+
+async function copyText(){
+  const text = document.getElementById("outputText").value
+  if(!text){ alert("No text to copy!"); return }
+  try{
+    if(window.require){
+      const { clipboard } = window.require("electron")
+      clipboard.writeText(text); alert("✔ Text copied to clipboard!"); return
+    }
+  }catch(e){}
+  try{ await navigator.clipboard.writeText(text); alert("✔ Text copied to clipboard!"); return }catch(e){}
+  try{
+    const ta = document.createElement("textarea"); ta.value = text
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy")
+    document.body.removeChild(ta); alert("✔ Text copied to clipboard!")
+  }catch(err){ alert("Copy failed. Please copy manually.") }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CLEAR FUNCTIONS
+═══════════════════════════════════════════════════════ */
+
+function clearOcr(){
+  images = []
+  document.getElementById("preview").innerHTML = ""
+  document.getElementById("outputText").value = ""
+  document.getElementById("loader").style.display = "none"
+  // reset file input
+  const inp = document.getElementById("imageInput")
+  inp.value = ""
+}
+
+function clearKyc(){
+  document.getElementById("kyc-txt").value = ""
+  document.getElementById("kycOut").innerHTML = '<div class="kyc-ph">Output appears here — record by record</div>'
+  document.getElementById("kycCopyBar").style.display = "none"
+  allRows = []; lineCounter = 0
+}
+
+function clearAll(){
+  clearOcr()
+  clearKyc()
+  toast("✔ Cleared", "success")
+}
+
+/* ═══════════════════════════════════════════════════════
+   KYC JS
+═══════════════════════════════════════════════════════ */
+
+const API    = 'http://127.0.0.1:7523'
+const apiGet  = p    => fetch(API+p).then(r=>r.json())
+const apiPost = (p,b)=> fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json())
+
+function toast(msg, type=''){
+  const t = document.getElementById('toast'); t.textContent = msg
+  t.className = 'show ' + (type||'')
+  clearTimeout(t._t); t._t = setTimeout(() => t.className = '', 2800)
+}
+
+function setStatus(state, label){
+  const dot = document.getElementById('statusDot')
+  const bdg = document.getElementById('statusBadge')
+  dot.className = 'status-dot ' + state
+  bdg.textContent = label
+  bdg.className = 'status-badge' + (state === 'ready' ? ' ready' : '')
+}
+
+let allRows    = []
+let lineCounter = 0
+
+document.getElementById('kyc-txt').addEventListener('input', () => {
+  const b = document.getElementById('kyc-btn'); if(!b.disabled) b.textContent = '▶ Process Records'
+})
+
+async function initModel(){
+  try{
+    const r = await apiGet('/api/load_model')
+    if(r.ok){
+      setStatus('ready', 'Ready (' + r.device.toUpperCase() + ')')
+      const btn = document.getElementById('kyc-btn')
+      btn.disabled = false; btn.textContent = '▶ Process Records'
+    } else {
+      setStatus('error', 'Model Error')
+      document.getElementById('kyc-btn').textContent = 'Model error'
+    }
+  } catch(e){
+    setStatus('error', 'Server Unreachable')
+    document.getElementById('kyc-btn').textContent = 'Start server first'
+    console.error('initModel error:', e)
+  }
+}
+
+async function doExtract(){
+  const text = document.getElementById('kyc-txt').value.trim(); if(!text) return
+  allRows = []; lineCounter = 0
+  const total = (text.match(/^\d+\s+B[A-Z]{2,3}/gim) || []).length
+  const out = document.getElementById('kycOut')
+  out.innerHTML = ''
+  document.getElementById('kycCopyBar').style.display = 'none'
+  document.getElementById('kyc-btn').disabled = true
+  document.getElementById('kyc-btn').textContent = 'Processing…'
+  setStatus('active', '0/' + total)
+  document.getElementById('perfLbl').textContent = ''
+
+  const r = await apiPost('/api/extract', { text })
+  if(!r.ok){
+    out.innerHTML = '<div class="kyc-ph" style="color:#f87171">' + r.error + '</div>'
+    setStatus('error', 'Error')
+    document.getElementById('kyc-btn').disabled = false
+    document.getElementById('kyc-btn').textContent = '▶ Process Records'; return
+  }
+
+  allRows = r.rows.map(row => row.join('\t'))
+  document.getElementById('perfLbl').textContent = r.elapsed + 'ms'
+
+  for(let ri = 0; ri < r.rows.length; ri++){
+    const flds = r.rows[ri]
+    mkRow(ri, flds.length)
+    setStatus('active', (ri+1) + '/' + r.rows.length)
+    for(let fi = 0; fi < flds.length; fi++){
+      await slp(30)
+      addField(flds[fi], fi, flds.length, ri)
+    }
+    rmCur(ri)
+    document.getElementById('kyc-btn').textContent = '▶ Process Records'
+    await slp(40)
+  }
+  setStatus('ready', 'Ready')
+  document.getElementById('kyc-btn').disabled = false
+  document.getElementById('kyc-btn').textContent = '▶ Process Records'
+  showCopyBar()
+}
+
+function mkRow(ri, n){
+  const out = document.getElementById('kycOut')
+  lineCounter++
+  const line = document.createElement('div')
+  line.className = 'cv-line'; line.id = 'cvline-' + ri
+  line.innerHTML = `<div class="cv-ln">${lineCounter}</div><div class="cv-code" id="cvcode-${ri}"><span class="cur"></span></div>`
+  out.appendChild(line)
+  out.scrollTop = out.scrollHeight
+}
+
+function addField(val, fi, tot, ri){
+  const code = document.getElementById('cvcode-' + ri); if(!code) return
+  const cur = code.querySelector('.cur'); if(cur) cur.remove()
+  if(fi > 0){ const tab = document.createElement('span'); tab.className='f-sep'; tab.textContent='\t'; code.appendChild(tab) }
+  const sp = document.createElement('span'); sp.className = 'f-new'
+  if(val === 'N.A') sp.classList.add('f-na')
+  else if(fi === tot-1 && val && val.trim()) sp.classList.add('f-remark')
+  sp.textContent = val; code.appendChild(sp)
+  const cur2 = document.createElement('span'); cur2.className = 'cur'; code.appendChild(cur2)
+  const out = document.getElementById('kycOut'); out.scrollTop = out.scrollHeight
+}
+
+function rmCur(ri){
+  const code = document.getElementById('cvcode-' + ri)
+  if(code) code.querySelectorAll('.cur').forEach(c => c.remove())
+}
+
+function showCopyBar(){
+  document.getElementById('kycCopyBar').style.display = 'flex'
+  const na = allRows.reduce((s,r) => s + r.split('\t').filter(v => v==='N.A').length, 0)
+  document.getElementById('kycCopyInfo').textContent = allRows.length + ' records • 25 cols • ' + na + ' N.A'
+}
+
+async function copyAllTSV(){
+  const tsv = allRows.join('\n'), btn = document.getElementById('kycCopyBtn')
+  let ok = false
+  try{ if(window.require){ const{clipboard}=window.require('electron'); clipboard.writeText(tsv); ok=true } }catch(e){}
+  if(!ok){ try{ await navigator.clipboard.writeText(tsv); ok=true }catch(e){} }
+  if(ok){ btn.classList.add('ok'); btn.textContent='✓ Copied'; setTimeout(()=>{btn.classList.remove('ok');btn.textContent='⎘ Copy All TSV'},2500) }
+  else toast('Copy failed','error')
+}
+
+function openUrl(url){
+  try{ window.require('electron').shell.openExternal(url) }catch(e){ window.open(url) }
+}
+
+function slp(ms){ return new Promise(r => setTimeout(r, ms)) }
+
+window.addEventListener('DOMContentLoaded', () => initModel())
+
+</script>
+</body>
+</html>

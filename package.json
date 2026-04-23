@@ -1,0 +1,68 @@
+{
+  "name": "kyc-formatter",
+  "version": "1.0.0",
+  "description": "KYC FORMATTER PRO — Skylinx Global Solutions",
+  "main": "main.js",
+  "author": "Skylinx Global Solutions",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "build-python": "scripts\\build_python.bat"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "com.skylinxglobal.kycsuite",
+    "productName": "KYC FORMATTER",
+    "copyright": "Copyright © 2025 Skylinx Global Solutions",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python/dist/kyc_server",
+        "to": "python/kyc_server",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "model",
+        "to": "model",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KYC FORMATTER",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  }
+}
